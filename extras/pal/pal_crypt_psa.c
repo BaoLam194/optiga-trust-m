@@ -53,7 +53,7 @@ pal_status_t pal_crypt_tls_prf_sha256(pal_crypt_t *p_pal_crypt,
         return PAL_STATUS_FAILURE;
 
     if ((uint32_t)label_length + (uint32_t)seed_length > sizeof(label_seed))
-        return PAL_STATUS_INVALID_INPUT;
+        return PAL_STATUS_FAILURE;
 
     memcpy(label_seed, p_label, label_length);
     memcpy(label_seed + label_length, p_seed, seed_length);
@@ -127,6 +127,9 @@ pal_status_t pal_crypt_encrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
                                          uint8_t mac_size,
                                          uint8_t *p_cipher_text)
 {
+#define AES128_KEY_BITS_SIZE    (128U)
+#define AES128_KEY_BYTES_SIZE   (16U)
+
     (void)p_pal_crypt;
 
     psa_status_t st;
@@ -146,11 +149,11 @@ pal_status_t pal_crypt_encrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
         return PAL_STATUS_FAILURE;
 
     psa_set_key_type(&attr, PSA_KEY_TYPE_AES);
-    psa_set_key_bits(&attr, 128);
+    psa_set_key_bits(&attr, AES128_KEY_BITS_SIZE);
     psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT);
     psa_set_key_algorithm(&attr, PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, mac_size));
 
-    st = psa_import_key(&attr, p_encrypt_key, 16, &key_id);
+    st = psa_import_key(&attr, p_encrypt_key, AES128_KEY_BYTES_SIZE, &key_id);
     psa_reset_key_attributes(&attr);
     if (st != PSA_SUCCESS)
         return PAL_STATUS_FAILURE;
@@ -165,7 +168,8 @@ pal_status_t pal_crypt_encrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
                           &out_len);
 
     psa_destroy_key(key_id);
-
+#undef AES128_KEY_BITS_SIZE
+#undef AES128_KEY_BYTES_SIZE
     return (st == PSA_SUCCESS && out_len == (size_t)plain_text_length + mac_size) ?
            PAL_STATUS_SUCCESS : PAL_STATUS_FAILURE;
 }
@@ -181,6 +185,9 @@ pal_status_t pal_crypt_decrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
                                          uint8_t mac_size,
                                          uint8_t *p_plain_text)
 {
+#define AES128_KEY_BITS_SIZE    (128U)
+#define AES128_KEY_BYTES_SIZE   (16U)
+
     (void)p_pal_crypt;
 
     psa_status_t st;
@@ -196,18 +203,18 @@ pal_status_t pal_crypt_decrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
 #endif
 
     if (cipher_text_length < mac_size)
-        return PAL_STATUS_INVALID_INPUT;
+        return PAL_STATUS_FAILURE;
 
     st = pal_psa_init_once();
     if (st != PSA_SUCCESS)
         return PAL_STATUS_FAILURE;
 
     psa_set_key_type(&attr, PSA_KEY_TYPE_AES);
-    psa_set_key_bits(&attr, 128);
+    psa_set_key_bits(&attr, AES128_KEY_BITS_SIZE);
     psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_DECRYPT);
     psa_set_key_algorithm(&attr, PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, mac_size));
 
-    st = psa_import_key(&attr, p_decrypt_key, 16, &key_id);
+    st = psa_import_key(&attr, p_decrypt_key, AES128_KEY_BYTES_SIZE, &key_id);
     psa_reset_key_attributes(&attr);
     if (st != PSA_SUCCESS)
         return PAL_STATUS_FAILURE;
@@ -221,7 +228,8 @@ pal_status_t pal_crypt_decrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
                           &out_len);
 
     psa_destroy_key(key_id);
-
+#undef AES128_KEY_BITS_SIZE
+#undef AES128_KEY_BYTES_SIZE
     return (st == PSA_SUCCESS && out_len == (size_t)cipher_text_length - mac_size) ?
            PAL_STATUS_SUCCESS : PAL_STATUS_FAILURE;
 }
