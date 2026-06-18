@@ -43,8 +43,10 @@ pal_status_t pal_crypt_tls_prf_sha256(pal_crypt_t *p_pal_crypt,
     uint8_t a[32];
     size_t a_len = 0;
 
+#ifdef OPTIGA_LIB_DEBUG_NULL_CHECK
     if (p_secret == NULL || p_label == NULL || p_seed == NULL || p_derived_key == NULL)
         return PAL_STATUS_FAILURE;
+#endif
 
     st = pal_psa_init_once();
     if (st != PSA_SUCCESS)
@@ -133,9 +135,11 @@ pal_status_t pal_crypt_encrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
 
     size_t out_len = 0;
 
+#ifdef OPTIGA_LIB_DEBUG_NULL_CHECK
     if (p_plain_text == NULL || p_encrypt_key == NULL || p_nonce == NULL ||
         p_associated_data == NULL || p_cipher_text == NULL)
         return PAL_STATUS_FAILURE;
+#endif
 
     st = pal_psa_init_once();
     if (st != PSA_SUCCESS)
@@ -185,9 +189,11 @@ pal_status_t pal_crypt_decrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
 
     size_t out_len = 0;
 
+#ifdef OPTIGA_LIB_DEBUG_NULL_CHECK
     if (p_cipher_text == NULL || p_decrypt_key == NULL || p_nonce == NULL ||
         p_associated_data == NULL || p_plain_text == NULL)
         return PAL_STATUS_FAILURE;
+#endif
 
     if (cipher_text_length < mac_size)
         return PAL_STATUS_INVALID_INPUT;
