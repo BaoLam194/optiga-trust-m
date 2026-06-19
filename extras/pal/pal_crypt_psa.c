@@ -33,87 +33,67 @@ pal_status_t pal_crypt_tls_prf_sha256(pal_crypt_t *p_pal_crypt,
 {
     (void)p_pal_crypt;
 
-    psa_status_t st;
+    pal_status_t return_value = PAL_STATUS_FAILURE;
+    psa_status_t status;
     psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_algorithm_t alg = PSA_ALG_TLS12_PRF(PSA_ALG_SHA_256);
+    psa_key_derivation_operation_t operation = PSA_KEY_DERIVATION_OPERATION_INIT;
     psa_key_id_t key_id = 0;
 
-    uint8_t label_seed[PAL_CRYPT_MAX_LABEL_SEED_LENGTH];
-    size_t label_seed_len;
-
-    uint8_t a[32];
-    size_t a_len = 0;
-
+    do{
 #ifdef OPTIGA_LIB_DEBUG_NULL_CHECK
-    if (p_secret == NULL || p_label == NULL || p_seed == NULL || p_derived_key == NULL)
-        return PAL_STATUS_FAILURE;
+        if (p_secret == NULL || p_label == NULL || p_seed == NULL || p_derived_key == NULL)
+            break;
 #endif
 
-    st = pal_psa_init_once();
-    if (st != PSA_SUCCESS)
-        return PAL_STATUS_FAILURE;
+        status = pal_psa_init_once();
+        if (status != PSA_SUCCESS)
+            break;
 
-    if ((uint32_t)label_length + (uint32_t)seed_length > sizeof(label_seed))
-        return PAL_STATUS_FAILURE;
+        /* Import the key */
+        psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_DERIVE);
+        psa_set_key_algorithm(&attr, alg);
+        psa_set_key_type(&attr, PSA_KEY_TYPE_DERIVE);
+        status = psa_import_key(&attr, p_secret, (size_t)secret_length, &key_id);
+        if (status != PSA_SUCCESS)
+            break;
+        psa_reset_key_attributes(&attr);
 
-    memcpy(label_seed, p_label, label_length);
-    memcpy(label_seed + label_length, p_seed, seed_length);
-    label_seed_len = (size_t)label_length + (size_t)seed_length;
+        /* Derive the key */
+        status = psa_key_derivation_setup(&operation, alg);
+        if (status != PSA_SUCCESS) {
+            break;
+        }
+        status = psa_key_derivation_set_capacity(&operation, derived_key_length);
+        if (status != PSA_SUCCESS) {
+            break;
+        }
+        status = psa_key_derivation_input_bytes(&operation, PSA_KEY_DERIVATION_INPUT_SEED, 
+                                                p_seed, seed_length); 
+        if (status != PSA_SUCCESS) {
+            break;
+        }
+        status =  psa_key_derivation_input_key(&operation, PSA_KEY_DERIVATION_INPUT_SECRET, key_id); 
+        if (status != PSA_SUCCESS) {
+            break;
+        }
+        status = psa_key_derivation_input_bytes(&operation, PSA_KEY_DERIVATION_INPUT_LABEL, 
+                                                p_label, label_length); 
+        if (status != PSA_SUCCESS) {
+            break;
+        }
+        status = psa_key_derivation_output_bytes(&operation, p_derived_key, derived_key_length);
+        if (status != PSA_SUCCESS) {
+            break;
+        }
+        return_value = PAL_STATUS_SUCCESS;
+    } while(FALSE);
 
-    /* Import HMAC key */
-    psa_set_key_type(&attr, PSA_KEY_TYPE_HMAC);
-    psa_set_key_bits(&attr, (size_t)secret_length * 8u);
-    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_SIGN_MESSAGE);
-    psa_set_key_algorithm(&attr, PSA_ALG_HMAC(PSA_ALG_SHA_256));
-
-    st = psa_import_key(&attr, p_secret, (size_t)secret_length, &key_id);
-    psa_reset_key_attributes(&attr);
-    if (st != PSA_SUCCESS)
-        return PAL_STATUS_FAILURE;
-
-    /* A(1) */
-    st = psa_mac_compute(key_id, PSA_ALG_HMAC(PSA_ALG_SHA_256),
-                         label_seed, label_seed_len,
-                         a, sizeof(a), &a_len);
-    if (st != PSA_SUCCESS || a_len != 32) {
-        psa_destroy_key(key_id);
-        return PAL_STATUS_FAILURE;
-    }
-
-    size_t produced = 0;
-    while (produced < (size_t)derived_key_length) {
-        /* HMAC(secret, A(i) || label_seed) */
-        psa_mac_operation_t op = PSA_MAC_OPERATION_INIT;
-        uint8_t h[32];
-        size_t h_len = 0;
-
-        st = psa_mac_sign_setup(&op, key_id, PSA_ALG_HMAC(PSA_ALG_SHA_256));
-        if (st != PSA_SUCCESS) break;
-
-        st = psa_mac_update(&op, a, a_len);
-        if (st != PSA_SUCCESS) { psa_mac_abort(&op); break; }
-
-        st = psa_mac_update(&op, label_seed, label_seed_len);
-        if (st != PSA_SUCCESS) { psa_mac_abort(&op); break; }
-
-        st = psa_mac_sign_finish(&op, h, sizeof(h), &h_len);
-        if (st != PSA_SUCCESS || h_len != 32) { psa_mac_abort(&op); break; }
-
-        size_t to_copy = ((size_t)derived_key_length - produced < 32u) ?
-                         ((size_t)derived_key_length - produced) : 32u;
-        memcpy(p_derived_key + produced, h, to_copy);
-        produced += to_copy;
-
-        /* A(i+1) = HMAC(secret, A(i)) */
-        st = psa_mac_compute(key_id, PSA_ALG_HMAC(PSA_ALG_SHA_256),
-                             a, a_len,
-                             a, sizeof(a), &a_len);
-        if (st != PSA_SUCCESS || a_len != 32) break;
-    }
-
+    /* Clean up */
+    psa_key_derivation_abort(&operation);
     psa_destroy_key(key_id);
 
-    return (st == PSA_SUCCESS && produced == (size_t)derived_key_length) ?
-           PAL_STATUS_SUCCESS : PAL_STATUS_FAILURE;
+    return return_value;
 }
 
 pal_status_t pal_crypt_encrypt_aes128_ccm(pal_crypt_t *p_pal_crypt,
