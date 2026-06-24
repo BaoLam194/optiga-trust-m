@@ -47,16 +47,17 @@ pal_status_t pal_crypt_tls_prf_sha256(pal_crypt_t *p_pal_crypt,
 #endif
 
         status = pal_psa_init_once();
-        if (status != PSA_SUCCESS)
+        if (status != PSA_SUCCESS){
             break;
-
+        }
         /* Import the key */
         psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_DERIVE);
         psa_set_key_algorithm(&attr, alg);
         psa_set_key_type(&attr, PSA_KEY_TYPE_DERIVE);
         status = psa_import_key(&attr, p_secret, (size_t)secret_length, &key_id);
-        if (status != PSA_SUCCESS)
+        if (status != PSA_SUCCESS){
             break;
+        }
         psa_reset_key_attributes(&attr);
 
         /* Derive the key */
