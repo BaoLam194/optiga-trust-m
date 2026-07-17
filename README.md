@@ -46,43 +46,40 @@ Examples to demonstrate basic functionality of the security chip can be found [h
 
 The OPTIGA&trade; Trust M Host Library for C relies on Mbed TLS.
 
-The OPTIGA&trade; Trust M Host Library for C supports both MbedTLS 2.x and MbedTLS 3.x, the later will be referred to as "mbedtls-3.x".
+The OPTIGA&trade; Trust M Host Library for C supports Mbed TLS 4.x (with TF-PSA-Crypto).
 
-This library is cloned from a submodule under [external/mbedtls](external/mbedtls/) for Mbedtls 2.x and [external/mbedtls-3.x](external/mbedtls-3.x/) for MbedTLS 3.x folder. It comes with a default configuration that needs to be modified to the application purpose. 
+Note: For support for Mbed TLS 2.x/3.x, please check out the [`feature/mbedtls-3.x`](https://github.com/Infineon/optiga-trust-m/tree/feature/mbedtls-3.x) branch.
+This library is cloned from a submodule under [external/mbedtls-4.x](external/mbedtls-4.x/). It comes with a default configuration that needs to be modified to the application purpose.
 
-Under [config/mbedtls_default_config.h](config/mbedtls_default_config.h) a default configuration for MbedTLS 2.x is provided and should be changed depending on need.
+Two configuration files are provided and should be adjusted to fit your application:
 
-Under [config/mbedtls_3.x_default_config.h](config/mbedtls_3.x_default_config.h) a default configuration for MbedTLS 3.x is provided and should be changed depending on need.
+* [config/mbedtls_4.x_default_config.h](config/mbedtls_4.x_default_config.h) — default configuration for the Mbed TLS 4.x TLS/X.509 layer. Passed to the compiler via `MBEDTLS_USER_CONFIG_FILE`.
+* [config/tf_psa_default_config.h](config/tf_psa_default_config.h) — default PSA-crypto configuration for OPTIGA&trade; Trust M. Passed to the compiler via `TF_PSA_CRYPTO_USER_CONFIG_FILE`.
 
-During compilation, the following define needs to be added:
+In Mbed TLS 4.x, selection of cryptographic algorithms has moved from the TLS/X.509 config to the PSA crypto config, so both defines are typically required.
 
-> During compilation, the following define needs to be added :
-```
-MBEDTLS_USER_CONFIG_FILE="config/mbedtls_default_config.h"
-```
-or
-```
-MBEDTLS_USER_CONFIG_FILE="config/mbedtls_3.x_default_config.h"
-```
+Note: Mbed TLS 4.x carries `tf-psa-crypto` as its own submodule. After cloning, initialize it recursively with `git submodule update --init --recursive external/mbedtls-4.x`.
 
-for Makefile :
+During compilation, the following defines need to be added:
 
 ```
--DMBEDTLS_USER_CONFIG_FILE="config/mbedtls_default_config.h"
+MBEDTLS_USER_CONFIG_FILE="config/mbedtls_4.x_default_config.h"
+TF_PSA_CRYPTO_USER_CONFIG_FILE="config/tf_psa_default_config.h"
 ```
-or
+
+for `gcc` / `CFLAGS` (e.g. inside a Makefile via `CFLAGS += ...`) :
+
 ```
--DMBEDTLS_USER_CONFIG_FILE="config/mbedtls_3.x_default_config.h"
+-DMBEDTLS_USER_CONFIG_FILE="config/mbedtls_4.x_default_config.h" \
+-DTF_PSA_CRYPTO_USER_CONFIG_FILE="config/tf_psa_default_config.h"
 ```
 
 for CMake :
 
 ```
-target_compile_definitions(app PRIVATE MBEDTLS_USER_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/mbedtls_user_config.h")
-```
-or
-```
-target_compile_definitions(app PRIVATE MBEDTLS_USER_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/mbedtls_3.x_user_config.h")
+target_compile_definitions(app PRIVATE
+    MBEDTLS_USER_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/mbedtls_4.x_default_config.h"
+    TF_PSA_CRYPTO_USER_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/tf_psa_default_config.h")
 ```
 
 ## Host library overview
@@ -122,7 +119,7 @@ For more information please refer to the [Wiki page](https://github.com/Infineon
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
 
 ## Licensing
-   
+
 Please see our [LICENSE](LICENSE) for copyright and license information.
-   
+
 This project follows the REUSE approach, so copyright and licensing information is available for every file (including third party components) either in the file header, an individual *.license file or the .reuse/dep5 file. All licenses can be found in the [LICENSES](LICENSES) folder.
